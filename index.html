@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Workouts">
+  <meta name="theme-color" content="#0f0f10">
+  <link rel="manifest" href="manifest.json">
+<title>Workout tracker</title>
+<style>
+  :root {
+    --bg: #0f0f10;
+    --surface: #1a1a1c;
+    --surface-2: #232326;
+    --border: #2e2e32;
+    --text: #f2f2f0;
+    --text-secondary: #a3a3a0;
+    --text-muted: #6e6e6c;
+    --accent: #7f77dd;
+    --accent-text: #eeedfe;
+    --danger: #e24b4a;
+    --success: #639922;
+    --radius: 14px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    overscroll-behavior-y: none;
+  }
+  body {
+    padding-bottom: calc(72px + var(--safe-bottom));
+    min-height: 100vh;
+  }
+  h1, h2, h3 { font-weight: 600; margin: 0; }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(15,15,16,0.92);
+    backdrop-filter: blur(20px);
+    padding: calc(14px + var(--safe-top)) 20px 14px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .topbar h1 { font-size: 20px; }
+
+  .screen { display: none; padding: 16px 16px 24px; max-width: 560px; margin: 0 auto; }
+  .screen.active { display: block; }
+
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(15,15,16,0.94);
+    backdrop-filter: blur(20px);
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    padding-bottom: var(--safe-bottom);
+    z-index: 20;
+  }
+  .tab-btn {
+    flex: 1; background: none; border: none; color: var(--text-muted);
+    padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center;
+    gap: 3px; font-size: 11px;
+  }
+  .tab-btn.active { color: var(--accent); }
+  .tab-btn svg { width: 24px; height: 24px; }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-tap { cursor: pointer; }
+  .card-tap:active { background: var(--surface-2); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    width: 100%;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-danger { color: var(--danger); }
+  .btn-sm { padding: 8px 12px; font-size: 13px; width: auto; }
+  .btn-ghost { background: none; border: none; color: var(--accent); padding: 8px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%;
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 16px;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--text-muted);
+  }
+  .empty svg { width: 40px; height: 40px; margin-bottom: 12px; opacity: 0.5; }
+  .empty p { font-size: 15px; margin: 4px 0; }
+  .empty .sub { font-size: 13px; color: var(--text-muted); }
+
+  .set-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .set-row:last-child { border-bottom: none; }
+  .set-num { width: 22px; color: var(--text-muted); font-size: 13px; }
+  .set-row input {
+    width: 100%;
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 15px;
+    text-align: center;
+  }
+  .set-x { color: var(--text-muted); font-size: 13px; }
+  .set-remove { color: var(--text-muted); background: none; border: none; padding: 6px; font-size: 18px; }
+
+  .exercise-block {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+  }
+  .exercise-block .ex-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .exercise-block .ex-title { font-size: 15px; font-weight: 500; }
+
+  .pill {
+    display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    background: var(--surface-2); color: var(--text-secondary); margin-right: 6px;
+  }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--surface); border-radius: var(--radius); padding: 14px; border: 0.5px solid var(--border); }
+  .stat-card .label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .stat-card .value { font-size: 22px; font-weight: 600; }
+
+  .pr-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0; border-bottom: 0.5px solid var(--border);
+  }
+  .pr-row:last-child { border-bottom: none; }
+  .pr-name { font-size: 15px; font-weight: 500; }
+  .pr-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .pr-weight { font-size: 18px; font-weight: 600; color: var(--accent); }
+
+  .fab-space { height: 4px; }
+
+  .section-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--text-muted); margin: 20px 0 10px; padding: 0 2px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 100; align-items: flex-end;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface); width: 100%; border-radius: 20px 20px 0 0;
+    padding: 20px 20px calc(20px + var(--safe-bottom));
+    max-height: 85vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 16px; }
+
+  .exercise-picker-item {
+    padding: 13px 4px; border-bottom: 0.5px solid var(--border); font-size: 15px;
+  }
+  .exercise-picker-item:active { background: var(--surface-2); }
+  .exercise-picker-item:last-child { border-bottom: none; }
+
+  .history-date { font-size: 15px; font-weight: 500; }
+  .history-meta { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+  .history-tags { margin-top: 8px; }
+
+  .back-link {
+    display: inline-flex; align-items: center; gap: 4px; color: var(--accent);
+    font-size: 15px; margin-bottom: 14px; background: none; border: none; padding: 4px 0;
+  }
+
+  .toast {
+    position: fixed; bottom: calc(90px + var(--safe-bottom)); left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface-2); border: 0.5px solid var(--border);
+    color: var(--text); padding: 10px 18px; border-radius: 20px;
+    font-size: 14px; opacity: 0; transition: all 0.25s; z-index: 200; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1 id="topbarTitle">Workouts</h1>
+</div>
+
+<div class="screen active" id="screen-home">
+  <div id="homeContent"></div>
+</div>
+
+<div class="screen" id="screen-log">
+  <div id="logContent"></div>
+</div>
+
+<div class="screen" id="screen-history">
+  <div id="historyContent"></div>
+</div>
+
+<div class="screen" id="screen-dashboard">
+  <div id="dashboardContent"></div>
+</div>
+
+<div class="screen" id="screen-detail">
+  <div id="detailContent"></div>
+</div>
+
+<div class="tabbar">
+  <button class="tab-btn active" data-tab="home" onclick="switchTab('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+    Vandaag
+  </button>
+  <button class="tab-btn" data-tab="history" onclick="switchTab('history')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    Historie
+  </button>
+  <button class="tab-btn" data-tab="dashboard" onclick="switchTab('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V10M12 19V4M20 19v-7"/></svg>
+    PR's
+  </button>
+</div>
+
+<div class="modal-overlay" id="exercisePickerModal">
+  <div class="modal">
+    <h3>Oefening toevoegen</h3>
+    <div class="field">
+      <input type="text" id="newExerciseInput" placeholder="Naam van oefening" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" onclick="addNewExerciseName()" style="margin-bottom:16px;">Toevoegen</button>
+    <div id="exercisePickerList"></div>
+    <button class="btn btn-ghost" style="width:100%; margin-top:10px;" onclick="closeModal('exercisePickerModal')">Annuleren</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- Storage ----------
+const STORAGE_KEY = 'workouts_data_v1';
+let state = { workouts: [], knownExercises: [] };
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) {}
+  if (!state.workouts) state.workouts = [];
+  if (!state.knownExercises) state.knownExercises = [];
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ---------- Draft workout (in progress) ----------
+let draft = null; // { id, date, exercises: [{name, sets:[{weight, reps}]}] }
+
+function startNewWorkout() {
+  draft = { id: uid(), date: new Date().toISOString().slice(0,10), exercises: [] };
+  switchTab('home');
+  renderHome();
+}
+
+function todayLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'];
+  const months = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+// ---------- Tab switching ----------
+function switchTab(tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+  const titles = { home: 'Workouts', history: 'Historie', dashboard: 'Persoonlijke records' };
+  document.getElementById('topbarTitle').textContent = titles[tab] || 'Workouts';
+  if (tab === 'home') renderHome();
+  if (tab === 'history') renderHistory();
+  if (tab === 'dashboard') renderDashboard();
+}
+
+// ---------- Home / active workout ----------
+function renderHome() {
+  const c = document.getElementById('homeContent');
+  if (!draft) {
+    c.innerHTML = `
+      <div class="empty" style="padding-top: 40px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.5 6.5l11 11M14 3l7 7-2.5 2.5-7-7L14 3zM3 14l7 7-2.5 2.5-7-7L3 14z"/></svg>
+        <p>Nog geen training gestart vandaag.</p>
+        <div class="sub">Start een training om oefeningen, sets en herhalingen bij te houden.</div>
+      </div>
+      <button class="btn btn-primary" onclick="startNewWorkout()">Start training</button>
+    `;
+    return;
+  }
+
+  let exHtml = draft.exercises.map((ex, exIdx) => {
+    const setsHtml = ex.sets.map((s, sIdx) => `
+      <div class="set-row">
+        <div class="set-num">${sIdx + 1}</div>
+        <input type="number" inputmode="decimal" placeholder="kg" value="${s.weight ?? ''}"
+          onchange="updateSet(${exIdx}, ${sIdx}, 'weight', this.value)">
+        <div class="set-x">×</div>
+        <input type="number" inputmode="numeric" placeholder="reps" value="${s.reps ?? ''}"
+          onchange="updateSet(${exIdx}, ${sIdx}, 'reps', this.value)">
+        <button class="set-remove" aria-label="Verwijder set" onclick="removeSet(${exIdx}, ${sIdx})">
+          <i class="ti ti-x"></i>&times;
+        </button>
+      </div>
+    `).join('');
+
+    return `
+      <div class="exercise-block">
+        <div class="ex-header">
+          <div class="ex-title">${escapeHtml(ex.name)}</div>
+          <button class="btn-ghost" style="font-size:13px;" onclick="removeExercise(${exIdx})">Verwijder</button>
+        </div>
+        ${setsHtml || '<div style="color:var(--text-muted); font-size:13px; padding:6px 0;">Nog geen sets</div>'}
+        <button class="btn btn-sm" style="width:100%; margin-top:10px;" onclick="addSet(${exIdx})">+ Set toevoegen</button>
+      </div>
+    `;
+  }).join('');
+
+  c.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <div style="font-size:13px; color:var(--text-secondary);">${todayLabel(draft.date)}</div>
+      </div>
+      <button class="btn-ghost" style="font-size:13px;" onclick="cancelDraft()">Annuleren</button>
+    </div>
+    ${exHtml}
+    <button class="btn" style="margin-bottom:14px;" onclick="openExercisePicker()">+ Oefening toevoegen</button>
+    <button class="btn btn-primary" onclick="finishWorkout()" ${draft.exercises.length === 0 ? 'disabled style="opacity:0.5;"' : ''}>Training opslaan</button>
+  `;
+}
+
+function cancelDraft() {
+  if (confirm('Weet je zeker dat je deze training wilt annuleren? Niets wordt opgeslagen.')) {
+    draft = null;
+    renderHome();
+  }
+}
+
+function addSet(exIdx) {
+  const ex = draft.exercises[exIdx];
+  const last = ex.sets[ex.sets.length - 1];
+  ex.sets.push({ weight: last ? last.weight : '', reps: last ? last.reps : '' });
+  renderHome();
+}
+function removeSet(exIdx, sIdx) {
+  draft.exercises[exIdx].sets.splice(sIdx, 1);
+  renderHome();
+}
+function updateSet(exIdx, sIdx, field, value) {
+  draft.exercises[exIdx].sets[sIdx][field] = value === '' ? '' : parseFloat(value);
+}
+function removeExercise(exIdx) {
+  draft.exercises.splice(exIdx, 1);
+  renderHome();
+}
+
+function openExercisePicker() {
+  const list = document.getElementById('exercisePickerList');
+  if (state.knownExercises.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-muted); font-size:14px; padding:10px 4px;">Nog geen oefeningen. Voeg er een toe hierboven.</div>';
+  } else {
+    list.innerHTML = state.knownExercises.map(name => `
+      <div class="exercise-picker-item" onclick="pickExercise('${escapeAttr(name)}')">${escapeHtml(name)}</div>
+    `).join('');
+  }
+  document.getElementById('newExerciseInput').value = '';
+  document.getElementById('exercisePickerModal').classList.add('active');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function addNewExerciseName() {
+  const input = document.getElementById('newExerciseInput');
+  const name = input.value.trim();
+  if (!name) return;
+  if (!state.knownExercises.includes(name)) {
+    state.knownExercises.push(name);
+    saveState();
+  }
+  pickExercise(name);
+}
+
+function pickExercise(name) {
+  if (!draft.exercises.find(e => e.name === name)) {
+    draft.exercises.push({ name, sets: [{ weight: '', reps: '' }] });
+  }
+  closeModal('exercisePickerModal');
+  renderHome();
+}
+
+function finishWorkout() {
+  const cleanExercises = draft.exercises
+    .map(ex => ({
+      name: ex.name,
+      sets: ex.sets.filter(s => s.weight !== '' && s.reps !== '' && !isNaN(s.weight) && !isNaN(s.reps))
+    }))
+    .filter(ex => ex.sets.length > 0);
+
+  if (cleanExercises.length === 0) {
+    showToast('Vul minstens één complete set in');
+    return;
+  }
+
+  const workout = { id: draft.id, date: draft.date, exercises: cleanExercises, savedAt: new Date().toISOString() };
+  state.workouts.unshift(workout);
+  saveState();
+  draft = null;
+  showToast('Training opgeslagen');
+  renderHome();
+}
+
+// ---------- History ----------
+function renderHistory() {
+  const c = document.getElementById('historyContent');
+  if (state.workouts.length === 0) {
+    c.innerHTML = `
+      <div class="empty" style="padding-top: 60px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <p>Nog geen trainingen opgeslagen.</p>
+        <div class="sub">Voltooide trainingen verschijnen hier.</div>
+      </div>
+    `;
+    return;
+  }
+  const sorted = [...state.workouts].sort((a,b) => b.date.localeCompare(a.date) || b.savedAt.localeCompare(a.savedAt));
+  c.innerHTML = sorted.map(w => {
+    const totalSets = w.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+    const names = w.exercises.map(e => e.name);
+    return `
+      <div class="card card-tap" onclick="openWorkoutDetail('${w.id}')">
+        <div class="history-date">${todayLabel(w.date)}</div>
+        <div class="history-meta">${w.exercises.length} oefening${w.exercises.length !== 1 ? 'en' : ''} &middot; ${totalSets} sets</div>
+        <div class="history-tags">${names.slice(0,4).map(n => `<span class="pill">${escapeHtml(n)}</span>`).join('')}${names.length > 4 ? `<span class="pill">+${names.length - 4}</span>` : ''}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openWorkoutDetail(id) {
+  const w = state.workouts.find(x => x.id === id);
+  if (!w) return;
+  const c = document.getElementById('detailContent');
+  const exHtml = w.exercises.map(ex => `
+    <div class="exercise-block">
+      <div class="ex-header"><div class="ex-title">${escapeHtml(ex.name)}</div></div>
+      ${ex.sets.map((s, i) => `
+        <div class="set-row">
+          <div class="set-num">${i+1}</div>
+          <div style="flex:1; font-size:15px;">${s.weight} kg</div>
+          <div class="set-x">×</div>
+          <div style="flex:1; font-size:15px;">${s.reps} reps</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+  c.innerHTML = `
+    <button class="back-link" onclick="switchTab('history')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Historie
+    </button>
+    <h2 style="margin-bottom:16px;">${todayLabel(w.date)}</h2>
+    ${exHtml}
+    <button class="btn btn-danger" style="margin-top:8px;" onclick="deleteWorkout('${w.id}')">Training verwijderen</button>
+  `;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-detail').classList.add('active');
+  document.getElementById('topbarTitle').textContent = 'Training';
+}
+
+function deleteWorkout(id) {
+  if (!confirm('Deze training permanent verwijderen?')) return;
+  state.workouts = state.workouts.filter(w => w.id !== id);
+  saveState();
+  switchTab('history');
+  showToast('Training verwijderd');
+}
+
+// ---------- Dashboard (PRs) ----------
+function renderDashboard() {
+  const c = document.getElementById('dashboardContent');
+  const prs = {}; // name -> { weight, reps, date }
+  state.workouts.forEach(w => {
+    w.exercises.forEach(ex => {
+      ex.sets.forEach(s => {
+        if (!prs[ex.name] || s.weight > prs[ex.name].weight) {
+          prs[ex.name] = { weight: s.weight, reps: s.reps, date: w.date };
+        }
+      });
+    });
+  });
+  const names = Object.keys(prs).sort();
+
+  if (names.length === 0) {
+    c.innerHTML = `
+      <div class="empty" style="padding-top: 60px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19V10M12 19V4M20 19v-7"/></svg>
+        <p>Nog geen records.</p>
+        <div class="sub">Voltooi een training om je persoonlijke records te zien.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const totalWorkouts = state.workouts.length;
+  const totalSets = state.workouts.reduce((sum, w) => sum + w.exercises.reduce((s2, e) => s2 + e.sets.length, 0), 0);
+
+  c.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">Trainingen</div><div class="value">${totalWorkouts}</div></div>
+      <div class="stat-card"><div class="label">Totaal sets</div><div class="value">${totalSets}</div></div>
+    </div>
+    <div class="section-title">Maximale gewichten</div>
+    <div class="card">
+      ${names.map(n => `
+        <div class="pr-row">
+          <div>
+            <div class="pr-name">${escapeHtml(n)}</div>
+            <div class="pr-meta">${prs[n].reps} reps &middot; ${todayLabel(prs[n].date)}</div>
+          </div>
+          <div class="pr-weight">${prs[n].weight} kg</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ---------- Utils ----------
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+function escapeAttr(str) {
+  return String(str).replace(/'/g, "\\'");
+}
+
+// ---------- Init ----------
+loadState();
+renderHome();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
+}
+</script>
+</body>
+</html>
