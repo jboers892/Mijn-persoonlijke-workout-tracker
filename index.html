@@ -48,8 +48,14 @@
     backdrop-filter: blur(20px);
     padding: calc(14px + var(--safe-top)) 20px 14px;
     border-bottom: 0.5px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
   }
   .topbar h1 { font-size: 20px; }
+  .topbar-icon-btn {
+    background: none; border: none; color: var(--text-secondary); padding: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .topbar-icon-btn:active { color: var(--accent); }
 
   .screen { display: none; padding: 16px 16px 24px; max-width: 560px; margin: 0 auto; }
   .screen.active { display: block; }
@@ -161,13 +167,18 @@
   .stat-card .value { font-size: 22px; font-weight: 600; }
 
   .pr-row {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
     padding: 14px 0; border-bottom: 0.5px solid var(--border);
   }
   .pr-row:last-child { border-bottom: none; }
+  .pr-info { flex: 1; min-width: 0; }
   .pr-name { font-size: 15px; font-weight: 500; }
   .pr-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .pr-weight { font-size: 18px; font-weight: 600; color: var(--accent); }
+  .pr-cat { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .pr-weight {
+    font-size: 18px; font-weight: 600; color: var(--accent);
+    white-space: nowrap; flex-shrink: 0; text-align: right;
+  }
 
   .fab-space { height: 4px; }
 
@@ -190,10 +201,12 @@
   .modal h3 { font-size: 17px; margin-bottom: 16px; }
 
   .exercise-picker-item {
-    padding: 13px 4px; border-bottom: 0.5px solid var(--border); font-size: 15px;
+    padding: 10px 4px; border-bottom: 0.5px solid var(--border); font-size: 15px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
-  .exercise-picker-item:active { background: var(--surface-2); }
   .exercise-picker-item:last-child { border-bottom: none; }
+  .exercise-picker-name { flex: 1; min-width: 0; padding: 3px 0; }
+  .exercise-picker-name:active { opacity: 0.7; }
 
   .history-date { font-size: 15px; font-weight: 500; }
   .history-meta { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
@@ -220,6 +233,9 @@
 
 <div class="topbar">
   <h1 id="topbarTitle">Workouts</h1>
+  <button class="topbar-icon-btn" aria-label="Categorieën beheren" onclick="openCategoryModal()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 005.6 15a1.65 1.65 0 00-1.51-1H4a2 2 0 010-4h.09A1.65 1.65 0 005 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 5.6a1.65 1.65 0 001-1.51V4a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+  </button>
 </div>
 
 <div class="screen active" id="screen-home">
@@ -263,9 +279,42 @@
     <div class="field">
       <input type="text" id="newExerciseInput" placeholder="Naam van oefening" autocomplete="off">
     </div>
+    <div class="field">
+      <label>Categorie</label>
+      <select id="newExerciseCategory"></select>
+    </div>
     <button class="btn btn-primary" onclick="addNewExerciseName()" style="margin-bottom:16px;">Toevoegen</button>
     <div id="exercisePickerList"></div>
     <button class="btn btn-ghost" style="width:100%; margin-top:10px;" onclick="closeModal('exercisePickerModal')">Annuleren</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editExerciseModal">
+  <div class="modal">
+    <h3>Oefening wijzigen</h3>
+    <div class="field">
+      <label>Naam</label>
+      <input type="text" id="editExerciseNameInput" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Categorie</label>
+      <select id="editExerciseCategorySelect"></select>
+    </div>
+    <button class="btn btn-primary" onclick="saveEditExercise()" style="margin-bottom:10px;">Opslaan</button>
+    <button class="btn" style="margin-bottom:10px; color:var(--danger);" onclick="deleteKnownExercise()">Oefening verwijderen uit lijst</button>
+    <button class="btn btn-ghost" style="width:100%;" onclick="cancelEditExercise()">Annuleren</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="categoryModal">
+  <div class="modal">
+    <h3>Categorieën beheren</h3>
+    <div id="categoryList" style="margin-bottom:16px;"></div>
+    <div class="field">
+      <input type="text" id="newCategoryInput" placeholder="Nieuwe categorie" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" onclick="addCategory()" style="margin-bottom:16px;">Categorie toevoegen</button>
+    <button class="btn btn-ghost" style="width:100%;" onclick="closeModal('categoryModal')">Sluiten</button>
   </div>
 </div>
 
@@ -274,7 +323,8 @@
 <script>
 // ---------- Storage ----------
 const STORAGE_KEY = 'workouts_data_v1';
-let state = { workouts: [], knownExercises: [] };
+const DEFAULT_CATEGORIES = ['Borst', 'Rug', 'Bicep', 'Tricep', 'Schouders', 'Benen', 'Buik'];
+let state = { workouts: [], knownExercises: [], categories: [...DEFAULT_CATEGORIES] };
 
 function loadState() {
   try {
@@ -283,6 +333,21 @@ function loadState() {
   } catch(e) {}
   if (!state.workouts) state.workouts = [];
   if (!state.knownExercises) state.knownExercises = [];
+  // migrate old string-based knownExercises to {name, category} objects
+  state.knownExercises = state.knownExercises.map(e => typeof e === 'string' ? { name: e, category: '' } : e);
+  if (!state.categories || state.categories.length === 0) state.categories = [...DEFAULT_CATEGORIES];
+  saveState();
+}
+
+function getExerciseCategory(name) {
+  const found = state.knownExercises.find(e => e.name === name);
+  return found ? (found.category || '') : '';
+}
+
+function categoryOptionsHtml(selected) {
+  let html = `<option value="" ${selected ? '' : 'selected'}>Geen categorie</option>`;
+  html += state.categories.map(c => `<option value="${escapeAttr(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+  return html;
 }
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
@@ -299,7 +364,7 @@ function showToast(msg) {
 let draft = null; // { id, date, exercises: [{name, sets:[{weight, reps}]}] }
 
 function startNewWorkout() {
-  draft = { id: uid(), date: new Date().toISOString().slice(0,10), exercises: [] };
+  draft = { id: uid(), name: '', date: new Date().toISOString().slice(0,10), exercises: [] };
   switchTab('home');
   renderHome();
 }
@@ -308,6 +373,11 @@ function updateDraftDate(value) {
   if (!value || !draft) return;
   draft.date = value;
   renderHome();
+}
+
+function updateDraftName(value) {
+  if (!draft) return;
+  draft.name = value;
 }
 
 function todayLabel(dateStr) {
@@ -373,6 +443,10 @@ function renderHome() {
   }).join('');
 
   c.innerHTML = `
+    <div class="field" style="margin-bottom:10px;">
+      <input type="text" placeholder="Naam van training (optioneel)" value="${draft.name ? escapeAttrHtml(draft.name) : ''}"
+        onchange="updateDraftName(this.value)">
+    </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px;">
       <div style="flex:1;">
         <div style="font-size:12px; color:var(--text-muted); margin-bottom:5px;">${todayLabel(draft.date)}</div>
@@ -417,16 +491,26 @@ let pickerTarget = 'draft';
 
 function openExercisePicker(target) {
   pickerTarget = target || 'draft';
+  renderExercisePickerList();
+  document.getElementById('newExerciseInput').value = '';
+  document.getElementById('newExerciseCategory').innerHTML = categoryOptionsHtml('');
+  document.getElementById('exercisePickerModal').classList.add('active');
+}
+function renderExercisePickerList() {
   const list = document.getElementById('exercisePickerList');
   if (state.knownExercises.length === 0) {
     list.innerHTML = '<div style="color:var(--text-muted); font-size:14px; padding:10px 4px;">Nog geen oefeningen. Voeg er een toe hierboven.</div>';
-  } else {
-    list.innerHTML = state.knownExercises.map(name => `
-      <div class="exercise-picker-item" onclick="pickExercise('${escapeAttr(name)}')">${escapeHtml(name)}</div>
-    `).join('');
+    return;
   }
-  document.getElementById('newExerciseInput').value = '';
-  document.getElementById('exercisePickerModal').classList.add('active');
+  list.innerHTML = [...state.knownExercises].sort((a,b) => a.name.localeCompare(b.name)).map(e => `
+    <div class="exercise-picker-item">
+      <div class="exercise-picker-name" onclick="pickExercise('${escapeAttr(e.name)}')">
+        <div>${escapeHtml(e.name)}</div>
+        ${e.category ? `<span class="pill" style="margin-top:4px;">${escapeHtml(e.category)}</span>` : ''}
+      </div>
+      <button class="btn-ghost" style="font-size:13px; flex-shrink:0;" onclick="openEditExerciseModal('${escapeAttr(e.name)}')">Wijzig</button>
+    </div>
+  `).join('');
 }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
@@ -434,8 +518,9 @@ function addNewExerciseName() {
   const input = document.getElementById('newExerciseInput');
   const name = input.value.trim();
   if (!name) return;
-  if (!state.knownExercises.includes(name)) {
-    state.knownExercises.push(name);
+  const category = document.getElementById('newExerciseCategory').value;
+  if (!state.knownExercises.find(e => e.name === name)) {
+    state.knownExercises.push({ name, category });
     saveState();
   }
   pickExercise(name);
@@ -451,6 +536,115 @@ function pickExercise(name) {
   if (pickerTarget === 'edit') renderDetailScreen(); else renderHome();
 }
 
+// ---------- Known exercise editing (rename / recategorize / delete) ----------
+let editingExerciseName = null;
+
+function openEditExerciseModal(name) {
+  closeModal('exercisePickerModal');
+  editingExerciseName = name;
+  const ex = state.knownExercises.find(e => e.name === name);
+  document.getElementById('editExerciseNameInput').value = name;
+  document.getElementById('editExerciseCategorySelect').innerHTML = categoryOptionsHtml(ex ? ex.category : '');
+  document.getElementById('editExerciseModal').classList.add('active');
+}
+
+function cancelEditExercise() {
+  closeModal('editExerciseModal');
+  openExercisePicker(pickerTarget);
+}
+
+function saveEditExercise() {
+  const newName = document.getElementById('editExerciseNameInput').value.trim();
+  const newCategory = document.getElementById('editExerciseCategorySelect').value;
+  if (!newName) { showToast('Vul een naam in'); return; }
+  const idx = state.knownExercises.findIndex(e => e.name === editingExerciseName);
+  if (idx === -1) return;
+  if (newName !== editingExerciseName && state.knownExercises.some((e, i) => i !== idx && e.name === newName)) {
+    showToast('Deze naam bestaat al');
+    return;
+  }
+  const oldName = editingExerciseName;
+  state.knownExercises[idx] = { name: newName, category: newCategory };
+  if (oldName !== newName) {
+    // cascade rename into all workouts and any open drafts so history/PRs stay consistent
+    state.workouts.forEach(w => w.exercises.forEach(ex => { if (ex.name === oldName) ex.name = newName; }));
+    if (draft) draft.exercises.forEach(ex => { if (ex.name === oldName) ex.name = newName; });
+    if (historyEdit) historyEdit.exercises.forEach(ex => { if (ex.name === oldName) ex.name = newName; });
+    saveState();
+  } else {
+    saveState();
+  }
+  closeModal('editExerciseModal');
+  showToast('Oefening bijgewerkt');
+  openExercisePicker(pickerTarget);
+}
+
+function deleteKnownExercise() {
+  if (!confirm(`Oefening "${editingExerciseName}" verwijderen uit de lijst? Eerder gelogde trainingen blijven bewaard.`)) return;
+  state.knownExercises = state.knownExercises.filter(e => e.name !== editingExerciseName);
+  saveState();
+  closeModal('editExerciseModal');
+  showToast('Oefening verwijderd');
+  openExercisePicker(pickerTarget);
+}
+
+// ---------- Category management ----------
+function openCategoryModal() {
+  renderCategoryList();
+  document.getElementById('newCategoryInput').value = '';
+  document.getElementById('categoryModal').classList.add('active');
+}
+function renderCategoryList() {
+  const list = document.getElementById('categoryList');
+  if (state.categories.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-muted); font-size:14px;">Nog geen categorieën.</div>';
+    return;
+  }
+  list.innerHTML = state.categories.map((cat, i) => `
+    <div class="exercise-picker-item">
+      <input type="text" value="${escapeAttrHtml(cat)}"
+        style="flex:1; min-width:0; background:var(--surface-2); border:0.5px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:14px;"
+        onchange="renameCategory(${i}, this.value)">
+      <button class="btn-ghost" style="font-size:13px; color:var(--danger); flex-shrink:0;" onclick="deleteCategory(${i})">Verwijder</button>
+    </div>
+  `).join('');
+}
+function addCategory() {
+  const input = document.getElementById('newCategoryInput');
+  const name = input.value.trim();
+  if (!name) return;
+  if (state.categories.includes(name)) { showToast('Categorie bestaat al'); return; }
+  state.categories.push(name);
+  saveState();
+  input.value = '';
+  renderCategoryList();
+}
+function renameCategory(i, newName) {
+  newName = newName.trim();
+  if (!newName) { renderCategoryList(); return; }
+  const oldName = state.categories[i];
+  if (oldName === newName) return;
+  if (state.categories.some((c, idx) => idx !== i && c === newName)) {
+    showToast('Categorie bestaat al');
+    renderCategoryList();
+    return;
+  }
+  state.categories[i] = newName;
+  state.knownExercises.forEach(e => { if (e.category === oldName) e.category = newName; });
+  saveState();
+  renderCategoryList();
+  showToast('Categorie bijgewerkt');
+}
+function deleteCategory(i) {
+  const name = state.categories[i];
+  if (!confirm(`Categorie "${name}" verwijderen? Oefeningen met deze categorie verliezen hun categorie.`)) return;
+  state.categories.splice(i, 1);
+  state.knownExercises.forEach(e => { if (e.category === name) e.category = ''; });
+  saveState();
+  renderCategoryList();
+  showToast('Categorie verwijderd');
+}
+
 function finishWorkout() {
   const cleanExercises = draft.exercises
     .map(ex => ({
@@ -464,7 +658,7 @@ function finishWorkout() {
     return;
   }
 
-  const workout = { id: draft.id, date: draft.date, exercises: cleanExercises, savedAt: new Date().toISOString() };
+  const workout = { id: draft.id, name: (draft.name || '').trim(), date: draft.date, exercises: cleanExercises, savedAt: new Date().toISOString() };
   state.workouts.unshift(workout);
   saveState();
   draft = null;
@@ -473,6 +667,24 @@ function finishWorkout() {
 }
 
 // ---------- History ----------
+let historyFilterCategory = 'all';
+
+function setHistoryFilter(cat) {
+  historyFilterCategory = cat;
+  renderHistory();
+}
+
+function historyFilterChips() {
+  const cats = ['all', ...state.categories];
+  const chipsHtml = cats.map(c => {
+    const label = c === 'all' ? 'Alle' : c;
+    const active = historyFilterCategory === c;
+    return `<button class="btn-sm" style="border-radius:20px; margin:0 6px 8px 0; ${active ? 'background:var(--accent); color:#fff; border-color:var(--accent);' : 'background:var(--surface-2); color:var(--text-secondary);'}"
+      onclick="setHistoryFilter('${escapeAttr(c)}')">${escapeHtml(label)}</button>`;
+  }).join('');
+  return `<div style="display:flex; flex-wrap:wrap; margin-bottom:14px;">${chipsHtml}</div>`;
+}
+
 function renderHistory() {
   const c = document.getElementById('historyContent');
   if (state.workouts.length === 0) {
@@ -485,14 +697,31 @@ function renderHistory() {
     `;
     return;
   }
+  const filterHtml = historyFilterChips();
   const sorted = [...state.workouts].sort((a,b) => b.date.localeCompare(a.date) || b.savedAt.localeCompare(a.savedAt));
-  c.innerHTML = sorted.map(w => {
+  const filtered = historyFilterCategory === 'all'
+    ? sorted
+    : sorted.filter(w => w.exercises.some(e => getExerciseCategory(e.name) === historyFilterCategory));
+
+  if (filtered.length === 0) {
+    c.innerHTML = `
+      ${filterHtml}
+      <div class="empty" style="padding-top: 30px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        <p>Geen trainingen met deze categorie.</p>
+        <div class="sub">Kies een andere categorie om trainingen te zien.</div>
+      </div>
+    `;
+    return;
+  }
+
+  c.innerHTML = filterHtml + filtered.map(w => {
     const totalSets = w.exercises.reduce((sum, e) => sum + e.sets.length, 0);
     const names = w.exercises.map(e => e.name);
     return `
       <div class="card card-tap" onclick="openWorkoutDetail('${w.id}')">
-        <div class="history-date">${todayLabel(w.date)}</div>
-        <div class="history-meta">${w.exercises.length} oefening${w.exercises.length !== 1 ? 'en' : ''} &middot; ${totalSets} sets</div>
+        <div class="history-date">${w.name ? escapeHtml(w.name) : todayLabel(w.date)}</div>
+        <div class="history-meta">${w.name ? todayLabel(w.date) + ' &middot; ' : ''}${w.exercises.length} oefening${w.exercises.length !== 1 ? 'en' : ''} &middot; ${totalSets} sets</div>
         <div class="history-tags">${names.slice(0,4).map(n => `<span class="pill">${escapeHtml(n)}</span>`).join('')}${names.length > 4 ? `<span class="pill">+${names.length - 4}</span>` : ''}</div>
       </div>
     `;
@@ -543,7 +772,10 @@ function renderDetailView(c, w) {
       Historie
     </button>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <h2>${todayLabel(w.date)}</h2>
+      <div>
+        <h2>${w.name ? escapeHtml(w.name) : todayLabel(w.date)}</h2>
+        ${w.name ? `<div style="font-size:13px; color:var(--text-secondary); margin-top:2px;">${todayLabel(w.date)}</div>` : ''}
+      </div>
       <button class="btn-ghost" style="font-size:14px;" onclick="startEditWorkout()">Bewerken</button>
     </div>
     ${exHtml}
@@ -593,6 +825,10 @@ function renderDetailEdit(c) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
       Annuleren
     </button>
+    <div class="field" style="margin-bottom:10px;">
+      <input type="text" placeholder="Naam van training (optioneel)" value="${historyEdit.name ? escapeAttrHtml(historyEdit.name) : ''}"
+        onchange="updateEditName(this.value)">
+    </div>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:10px;">
       <div style="flex:1;">
         <div style="font-size:12px; color:var(--text-muted); margin-bottom:5px;">${todayLabel(historyEdit.date)}</div>
@@ -611,6 +847,10 @@ function updateEditDate(value) {
   if (!value || !historyEdit) return;
   historyEdit.date = value;
   renderDetailScreen();
+}
+function updateEditName(value) {
+  if (!historyEdit) return;
+  historyEdit.name = value;
 }
 function addEditSet(exIdx) {
   const ex = historyEdit.exercises[exIdx];
@@ -647,6 +887,7 @@ function saveEditWorkout() {
   if (idx === -1) return;
   state.workouts[idx] = {
     id: historyEdit.id,
+    name: (historyEdit.name || '').trim(),
     date: historyEdit.date,
     exercises: cleanExercises,
     savedAt: state.workouts[idx].savedAt,
@@ -670,6 +911,23 @@ function deleteWorkout(id) {
 let dashboardFilter = 'all'; // 'all' | '7' | '30' | '90' | 'year' | 'custom'
 let dashboardCustomFrom = '';
 let dashboardCustomTo = '';
+let dashboardCategoryFilter = 'all';
+
+function setDashboardCategoryFilter(c) {
+  dashboardCategoryFilter = c;
+  renderDashboard();
+}
+
+function dashboardCategoryChips() {
+  const cats = ['all', ...state.categories];
+  const chipsHtml = cats.map(c => {
+    const label = c === 'all' ? 'Alle categorieën' : c;
+    const active = dashboardCategoryFilter === c;
+    return `<button class="btn-sm" style="border-radius:20px; margin:0 6px 8px 0; ${active ? 'background:var(--accent); color:#fff; border-color:var(--accent);' : 'background:var(--surface-2); color:var(--text-secondary);'}"
+      onclick="setDashboardCategoryFilter('${escapeAttr(c)}')">${escapeHtml(label)}</button>`;
+  }).join('');
+  return `<div style="display:flex; flex-wrap:wrap; margin-bottom:16px;">${chipsHtml}</div>`;
+}
 
 function getFilteredWorkouts() {
   if (dashboardFilter === 'all') return state.workouts;
@@ -754,17 +1012,20 @@ function renderDashboard() {
       });
     });
   });
-  const names = Object.keys(prs).sort();
+  let names = Object.keys(prs).sort();
+  if (dashboardCategoryFilter !== 'all') {
+    names = names.filter(n => getExerciseCategory(n) === dashboardCategoryFilter);
+  }
 
-  const filterHtml = dashboardFilterChips();
+  const filterHtml = dashboardFilterChips() + dashboardCategoryChips();
 
   if (names.length === 0) {
     c.innerHTML = `
       ${filterHtml}
       <div class="empty" style="padding-top: 30px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19V10M12 19V4M20 19v-7"/></svg>
-        <p>Geen trainingen in deze periode.</p>
-        <div class="sub">Kies een andere periode om records te zien.</div>
+        <p>Geen trainingen voor dit filter.</p>
+        <div class="sub">Kies een andere periode of categorie om records te zien.</div>
       </div>
     `;
     return;
@@ -781,15 +1042,19 @@ function renderDashboard() {
     </div>
     <div class="section-title">Maximale gewichten</div>
     <div class="card">
-      ${names.map(n => `
+      ${names.map(n => {
+        const cat = getExerciseCategory(n);
+        return `
         <div class="pr-row">
-          <div>
+          <div class="pr-info">
             <div class="pr-name">${escapeHtml(n)}</div>
             <div class="pr-meta">${prs[n].reps} reps &middot; ${todayLabel(prs[n].date)}</div>
+            ${cat ? `<div class="pr-cat">${escapeHtml(cat)}</div>` : ''}
           </div>
           <div class="pr-weight">${prs[n].weight} kg</div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
   `;
 }
@@ -802,6 +1067,13 @@ function escapeHtml(str) {
 }
 function escapeAttr(str) {
   return String(str).replace(/'/g, "\\'");
+}
+function escapeAttrHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // ---------- Init ----------
