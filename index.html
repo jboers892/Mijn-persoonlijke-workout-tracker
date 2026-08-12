@@ -233,9 +233,14 @@
 
 <div class="topbar">
   <h1 id="topbarTitle">Workouts</h1>
-  <button class="topbar-icon-btn" aria-label="Categorieën beheren" onclick="openCategoryModal()">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 005.6 15a1.65 1.65 0 00-1.51-1H4a2 2 0 010-4h.09A1.65 1.65 0 005 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 5.6a1.65 1.65 0 001-1.51V4a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-  </button>
+  <div style="display:flex; align-items:center; gap:2px;">
+    <button class="topbar-icon-btn" aria-label="Back-up en herstel" onclick="openBackupModal()">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+    </button>
+    <button class="topbar-icon-btn" aria-label="Categorieën beheren" onclick="openCategoryModal()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 005.6 15a1.65 1.65 0 00-1.51-1H4a2 2 0 010-4h.09A1.65 1.65 0 005 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 5.6a1.65 1.65 0 001-1.51V4a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </button>
+  </div>
 </div>
 
 <div class="screen active" id="screen-home">
@@ -318,7 +323,24 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="backupModal">
+  <div class="modal">
+    <h3>Back-up & herstel</h3>
+    <p style="font-size:14px; color:var(--text-secondary); margin:0 0 18px;">
+      Exporteer je trainingshistorie als CSV-bestand om te bewaren, en importeer het later weer om je trainingen terug te zetten of aan te vullen. Bestaande trainingen worden niet dubbel geïmporteerd.
+    </p>
+    <div class="section-title" style="margin-top:0;">Exporteren</div>
+    <button class="btn btn-primary" style="margin-bottom:20px;" onclick="exportWorkoutsCsv()">Exporteer trainingshistorie (CSV)</button>
+    <div class="section-title">Importeren</div>
+    <input type="file" id="importFileInput" accept=".csv,text/csv" style="display:none;" onchange="handleImportFile(this)">
+    <button class="btn" style="margin-bottom:6px;" onclick="document.getElementById('importFileInput').click()">Kies CSV-bestand om te importeren</button>
+    <div id="importStatus" style="font-size:13px; color:var(--text-muted); min-height:18px; margin-bottom:14px;"></div>
+    <button class="btn btn-ghost" style="width:100%;" onclick="closeModal('backupModal')">Sluiten</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+
 
 <script>
 // ---------- Storage ----------
@@ -643,6 +665,203 @@ function deleteCategory(i) {
   saveState();
   renderCategoryList();
   showToast('Categorie verwijderd');
+}
+
+// ---------- Backup & restore (CSV export/import) ----------
+function openBackupModal() {
+  document.getElementById('importStatus').textContent = '';
+  document.getElementById('backupModal').classList.add('active');
+}
+
+function csvEscape(val) {
+  const str = String(val ?? '');
+  if (/[",\n\r]/.test(str)) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function exportWorkoutsCsv() {
+  if (state.workouts.length === 0) {
+    showToast('Nog geen trainingen om te exporteren');
+    return;
+  }
+  const header = ['workout_id','workout_name','date','exercise_name','category','set_number','weight','reps','saved_at'];
+  const rows = [header.join(',')];
+  [...state.workouts]
+    .sort((a,b) => a.date.localeCompare(b.date) || (a.savedAt||'').localeCompare(b.savedAt||''))
+    .forEach(w => {
+      w.exercises.forEach(ex => {
+        ex.sets.forEach((s, i) => {
+          rows.push([
+            csvEscape(w.id),
+            csvEscape(w.name || ''),
+            csvEscape(w.date),
+            csvEscape(ex.name),
+            csvEscape(getExerciseCategory(ex.name)),
+            i + 1,
+            s.weight,
+            s.reps,
+            csvEscape(w.savedAt || '')
+          ].join(','));
+        });
+      });
+    });
+  const csv = rows.join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `workouts-export-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV geëxporteerd');
+}
+
+// Minimal RFC4180-style CSV parser (handles quoted fields with commas/newlines)
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i+1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field); field = '';
+    } else if (ch === '\n') {
+      row.push(field); rows.push(row); row = []; field = '';
+    } else if (ch === '\r') {
+      // skip, \n handles the row break
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+}
+
+function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('importStatus');
+  status.textContent = 'Bezig met importeren...';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      importWorkoutsCsv(e.target.result);
+    } catch (err) {
+      status.textContent = 'Kon het bestand niet lezen. Controleer of het een geëxporteerde CSV is.';
+    }
+    input.value = '';
+  };
+  reader.onerror = () => { status.textContent = 'Kon het bestand niet lezen.'; input.value = ''; };
+  reader.readAsText(file);
+}
+
+function importWorkoutsCsv(text) {
+  const status = document.getElementById('importStatus');
+  const rows = parseCsv(text);
+  if (rows.length < 2) {
+    status.textContent = 'Leeg of ongeldig CSV-bestand.';
+    return;
+  }
+  const header = rows[0].map(h => h.trim().toLowerCase());
+  const col = {
+    workout_id: header.indexOf('workout_id'),
+    workout_name: header.indexOf('workout_name'),
+    date: header.indexOf('date'),
+    exercise_name: header.indexOf('exercise_name'),
+    category: header.indexOf('category'),
+    weight: header.indexOf('weight'),
+    reps: header.indexOf('reps'),
+    saved_at: header.indexOf('saved_at'),
+  };
+  if (col.date === -1 || col.exercise_name === -1 || col.weight === -1 || col.reps === -1) {
+    status.textContent = 'CSV mist verplichte kolommen (date, exercise_name, weight, reps).';
+    return;
+  }
+
+  const grouped = new Map();
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || row.every(c => c.trim() === '')) continue;
+    const date = (row[col.date] || '').trim();
+    const exerciseName = (row[col.exercise_name] || '').trim();
+    if (!date || !exerciseName) continue;
+    const weight = parseFloat(row[col.weight]);
+    const reps = parseFloat(row[col.reps]);
+    if (isNaN(weight) || isNaN(reps)) continue;
+    const category = col.category !== -1 ? (row[col.category] || '').trim() : '';
+    const workoutName = col.workout_name !== -1 ? (row[col.workout_name] || '').trim() : '';
+    const savedAt = col.saved_at !== -1 ? (row[col.saved_at] || '').trim() : '';
+    const workoutId = col.workout_id !== -1 ? (row[col.workout_id] || '').trim() : '';
+    const groupKey = workoutId ? 'id:' + workoutId : 'dn:' + date + '|' + workoutName;
+
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, { name: workoutName, date, savedAt: savedAt || new Date().toISOString(), exercisesMap: new Map() });
+    }
+    const w = grouped.get(groupKey);
+    if (!w.exercisesMap.has(exerciseName)) w.exercisesMap.set(exerciseName, []);
+    w.exercisesMap.get(exerciseName).push({ weight, reps });
+
+    let known = state.knownExercises.find(e => e.name === exerciseName);
+    if (!known) {
+      state.knownExercises.push({ name: exerciseName, category });
+    } else if (category && !known.category) {
+      known.category = category;
+    }
+    if (category && !state.categories.includes(category)) {
+      state.categories.push(category);
+    }
+  }
+
+  if (grouped.size === 0) {
+    status.textContent = 'Geen geldige trainingen gevonden in dit bestand.';
+    return;
+  }
+
+  let importedCount = 0;
+  let skippedCount = 0;
+  grouped.forEach(w => {
+    const exercises = [...w.exercisesMap.entries()].map(([name, sets]) => ({ name, sets }));
+    const signature = w.date + '|' + w.name + '|' + JSON.stringify(exercises);
+    const alreadyExists = state.workouts.some(existing => {
+      const exSig = existing.date + '|' + (existing.name || '') + '|' + JSON.stringify(existing.exercises);
+      return exSig === signature;
+    });
+    if (alreadyExists) { skippedCount++; return; }
+    state.workouts.push({
+      id: uid(),
+      name: w.name,
+      date: w.date,
+      exercises,
+      savedAt: w.savedAt
+    });
+    importedCount++;
+  });
+
+  state.workouts.sort((a,b) => b.date.localeCompare(a.date) || (b.savedAt||'').localeCompare(a.savedAt||''));
+  saveState();
+
+  status.textContent = `${importedCount} training(en) geïmporteerd${skippedCount ? ', ' + skippedCount + ' overgeslagen (al aanwezig)' : ''}.`;
+  showToast('Import voltooid');
+
+  const activeBtn = document.querySelector('.tab-btn.active');
+  const activeTab = activeBtn ? activeBtn.dataset.tab : null;
+  if (activeTab === 'history') renderHistory();
+  if (activeTab === 'dashboard') renderDashboard();
+  if (activeTab === 'home') renderHome();
 }
 
 function finishWorkout() {
