@@ -282,13 +282,14 @@
   <div class="modal">
     <h3>Oefening toevoegen</h3>
     <div class="field">
-      <input type="text" id="newExerciseInput" placeholder="Naam van oefening" autocomplete="off">
+      <input type="text" id="newExerciseInput" placeholder="Zoek of typ een nieuwe oefening" autocomplete="off" oninput="renderExercisePickerList()">
     </div>
     <div class="field">
-      <label>Categorie</label>
+      <label>Categorie (voor nieuwe oefening)</label>
       <select id="newExerciseCategory"></select>
     </div>
-    <button class="btn btn-primary" onclick="addNewExerciseName()" style="margin-bottom:16px;">Toevoegen</button>
+    <button class="btn btn-primary" onclick="addNewExerciseName()" style="margin-bottom:14px;">Toevoegen</button>
+    <div id="exercisePickerCategoryChips" style="margin-bottom:8px;"></div>
     <div id="exercisePickerList"></div>
     <button class="btn btn-ghost" style="width:100%; margin-top:10px;" onclick="closeModal('exercisePickerModal')">Annuleren</button>
   </div>
@@ -510,13 +511,31 @@ function removeExercise(exIdx) {
 }
 
 let pickerTarget = 'draft';
+let exercisePickerCategoryFilter = 'all';
 
 function openExercisePicker(target) {
   pickerTarget = target || 'draft';
-  renderExercisePickerList();
+  exercisePickerCategoryFilter = 'all';
   document.getElementById('newExerciseInput').value = '';
   document.getElementById('newExerciseCategory').innerHTML = categoryOptionsHtml('');
+  renderExercisePickerCategoryChips();
+  renderExercisePickerList();
   document.getElementById('exercisePickerModal').classList.add('active');
+}
+function setExercisePickerCategoryFilter(c) {
+  exercisePickerCategoryFilter = c;
+  renderExercisePickerCategoryChips();
+  renderExercisePickerList();
+}
+function renderExercisePickerCategoryChips() {
+  const el = document.getElementById('exercisePickerCategoryChips');
+  const cats = ['all', ...state.categories];
+  el.innerHTML = `<div style="display:flex; flex-wrap:wrap;">${cats.map(c => {
+    const label = c === 'all' ? 'Alle' : c;
+    const active = exercisePickerCategoryFilter === c;
+    return `<button class="btn-sm" style="border-radius:20px; margin:0 6px 8px 0; ${active ? 'background:var(--accent); color:#fff; border-color:var(--accent);' : 'background:var(--surface-2); color:var(--text-secondary);'}"
+      onclick="setExercisePickerCategoryFilter('${escapeAttr(c)}')">${escapeHtml(label)}</button>`;
+  }).join('')}</div>`;
 }
 function renderExercisePickerList() {
   const list = document.getElementById('exercisePickerList');
@@ -524,7 +543,21 @@ function renderExercisePickerList() {
     list.innerHTML = '<div style="color:var(--text-muted); font-size:14px; padding:10px 4px;">Nog geen oefeningen. Voeg er een toe hierboven.</div>';
     return;
   }
-  list.innerHTML = [...state.knownExercises].sort((a,b) => a.name.localeCompare(b.name)).map(e => `
+  const query = (document.getElementById('newExerciseInput').value || '').trim().toLowerCase();
+  let items = [...state.knownExercises];
+  if (exercisePickerCategoryFilter !== 'all') {
+    items = items.filter(e => (e.category || '') === exercisePickerCategoryFilter);
+  }
+  if (query) {
+    items = items.filter(e => e.name.toLowerCase().includes(query));
+  }
+  items.sort((a,b) => a.name.localeCompare(b.name));
+
+  if (items.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-muted); font-size:14px; padding:10px 4px;">Geen oefeningen gevonden.</div>';
+    return;
+  }
+  list.innerHTML = items.map(e => `
     <div class="exercise-picker-item">
       <div class="exercise-picker-name" onclick="pickExercise('${escapeAttr(e.name)}')">
         <div>${escapeHtml(e.name)}</div>
@@ -1250,8 +1283,15 @@ function renderDashboard() {
     return;
   }
 
-  const totalWorkouts = filtered.length;
-  const totalSets = filtered.reduce((sum, w) => sum + w.exercises.reduce((s2, e) => s2 + e.sets.length, 0), 0);
+  const categoryFilteredWorkouts = dashboardCategoryFilter === 'all'
+    ? filtered
+    : filtered.filter(w => w.exercises.some(e => getExerciseCategory(e.name) === dashboardCategoryFilter));
+
+  const totalWorkouts = categoryFilteredWorkouts.length;
+  const totalSets = filtered.reduce((sum, w) => sum + w.exercises.reduce((s2, e) => {
+    if (dashboardCategoryFilter !== 'all' && getExerciseCategory(e.name) !== dashboardCategoryFilter) return s2;
+    return s2 + e.sets.length;
+  }, 0), 0);
 
   c.innerHTML = `
     ${filterHtml}
