@@ -155,6 +155,7 @@
     display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
   }
   .exercise-block .ex-title { font-size: 15px; font-weight: 500; }
+  .exercise-block .ex-pr { font-size: 12px; color: var(--accent); margin-top: 3px; }
 
   .pill {
     display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 20px;
@@ -367,6 +368,21 @@ function getExerciseCategory(name) {
   return found ? (found.category || '') : '';
 }
 
+function getExercisePR(name) {
+  let best = null;
+  state.workouts.forEach(w => {
+    w.exercises.forEach(ex => {
+      if (ex.name !== name) return;
+      ex.sets.forEach(s => {
+        if (!best || s.weight > best.weight) {
+          best = { weight: s.weight, reps: s.reps, date: w.date };
+        }
+      });
+    });
+  });
+  return best;
+}
+
 function categoryOptionsHtml(selected) {
   let html = `<option value="" ${selected ? '' : 'selected'}>Geen categorie</option>`;
   html += state.categories.map(c => `<option value="${escapeAttr(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
@@ -409,6 +425,11 @@ function todayLabel(dateStr) {
   const months = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
   return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`;
 }
+function shortDateLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const months = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
 
 // ---------- Tab switching ----------
 function switchTab(tab) {
@@ -439,6 +460,7 @@ function renderHome() {
   }
 
   let exHtml = draft.exercises.map((ex, exIdx) => {
+    const pr = getExercisePR(ex.name);
     const setsHtml = ex.sets.map((s, sIdx) => `
       <div class="set-row">
         <div class="set-num">${sIdx + 1}</div>
@@ -456,7 +478,10 @@ function renderHome() {
     return `
       <div class="exercise-block">
         <div class="ex-header">
-          <div class="ex-title">${escapeHtml(ex.name)}</div>
+          <div>
+            <div class="ex-title">${escapeHtml(ex.name)}</div>
+            ${pr ? `<div class="ex-pr">PR: ${pr.weight} kg &times; ${pr.reps} reps &middot; ${todayLabel(pr.date)}</div>` : ''}
+          </div>
           <button class="btn-ghost" style="font-size:13px;" onclick="removeExercise(${exIdx})">Verwijder</button>
         </div>
         ${setsHtml || '<div style="color:var(--text-muted); font-size:13px; padding:6px 0;">Nog geen sets</div>'}
@@ -1049,6 +1074,7 @@ function cancelEditWorkout() {
 
 function renderDetailEdit(c) {
   const exHtml = historyEdit.exercises.map((ex, exIdx) => {
+    const pr = getExercisePR(ex.name);
     const setsHtml = ex.sets.map((s, sIdx) => `
       <div class="set-row">
         <div class="set-num">${sIdx + 1}</div>
@@ -1063,7 +1089,10 @@ function renderDetailEdit(c) {
     return `
       <div class="exercise-block">
         <div class="ex-header">
-          <div class="ex-title">${escapeHtml(ex.name)}</div>
+          <div>
+            <div class="ex-title">${escapeHtml(ex.name)}</div>
+            ${pr ? `<div class="ex-pr">PR: ${pr.weight} kg &times; ${pr.reps} reps &middot; ${todayLabel(pr.date)}</div>` : ''}
+          </div>
           <button class="btn-ghost" style="font-size:13px;" onclick="removeEditExercise(${exIdx})">Verwijder</button>
         </div>
         ${setsHtml || '<div style="color:var(--text-muted); font-size:13px; padding:6px 0;">Nog geen sets</div>'}
@@ -1164,6 +1193,7 @@ let dashboardFilter = 'all'; // 'all' | '7' | '30' | '90' | 'year' | 'custom'
 let dashboardCustomFrom = '';
 let dashboardCustomTo = '';
 let dashboardCategoryFilter = 'all';
+let dashboardProgressExercise = null;
 
 function setDashboardCategoryFilter(c) {
   dashboardCategoryFilter = c;
@@ -1239,6 +1269,89 @@ function dashboardFilterChips() {
   return `<div style="display:flex; flex-wrap:wrap; margin-bottom:${dashboardFilter === 'custom' ? '2px' : '16px'};">${chipsHtml}</div>${customHtml}`;
 }
 
+function setDashboardProgressExercise(name) {
+  dashboardProgressExercise = name;
+  renderDashboard();
+}
+
+// One point per workout date for the given exercise (max weight logged that day), oldest first
+function getExerciseProgressPoints(name, workouts) {
+  const byDate = new Map();
+  workouts.forEach(w => {
+    w.exercises.forEach(ex => {
+      if (ex.name !== name) return;
+      ex.sets.forEach(s => {
+        const existing = byDate.get(w.date);
+        if (!existing || s.weight > existing.weight) {
+          byDate.set(w.date, { weight: s.weight, reps: s.reps });
+        }
+      });
+    });
+  });
+  return [...byDate.entries()]
+    .map(([date, v]) => ({ date, weight: v.weight, reps: v.reps }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function buildProgressSvg(points) {
+  const width = 320, height = 160;
+  const padding = { top: 14, right: 10, bottom: 22, left: 34 };
+  const plotW = width - padding.left - padding.right;
+  const plotH = height - padding.top - padding.bottom;
+
+  const weights = points.map(p => p.weight);
+  let minW = Math.min(...weights);
+  let maxW = Math.max(...weights);
+  if (minW === maxW) { minW -= 1; maxW += 1; }
+  const pad = (maxW - minW) * 0.15;
+  minW = Math.max(0, minW - pad);
+  maxW = maxW + pad;
+
+  const xFor = i => points.length === 1 ? padding.left + plotW / 2 : padding.left + (i / (points.length - 1)) * plotW;
+  const yFor = w => padding.top + plotH - ((w - minW) / (maxW - minW)) * plotH;
+
+  const linePoints = points.map((p, i) => `${xFor(i).toFixed(1)},${yFor(p.weight).toFixed(1)}`).join(' ');
+  const circles = points.map((p, i) => `<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(p.weight).toFixed(1)}" r="3.5" style="fill:var(--accent);"></circle>`).join('');
+
+  const gridLines = [0, 0.5, 1].map(t => {
+    const y = padding.top + plotH * t;
+    const val = Math.round(maxW - (maxW - minW) * t);
+    return `<line x1="${padding.left}" y1="${y.toFixed(1)}" x2="${width - padding.right}" y2="${y.toFixed(1)}" style="stroke:var(--border); stroke-width:1;"></line>
+            <text x="${padding.left - 6}" y="${(y + 3.5).toFixed(1)}" style="fill:var(--text-muted); font-size:10px;" text-anchor="end">${val}</text>`;
+  }).join('');
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="display:block; overflow:visible;">
+      ${gridLines}
+      <polyline points="${linePoints}" fill="none" style="stroke:var(--accent); stroke-width:2;"></polyline>
+      ${circles}
+    </svg>
+  `;
+}
+
+function renderProgressChart(points) {
+  if (points.length === 0) {
+    return '<div style="color:var(--text-muted); font-size:14px; padding:6px 0;">Nog geen data voor deze oefening.</div>';
+  }
+  if (points.length === 1) {
+    return `<div style="color:var(--text-muted); font-size:14px; padding:6px 0;">Nog maar 1 meting (${points[0].weight} kg op ${shortDateLabel(points[0].date)}). Log nog een training om je voortgang te zien.</div>`;
+  }
+  const svg = buildProgressSvg(points);
+  const first = points[0];
+  const last = points[points.length - 1];
+  const delta = Math.round((last.weight - first.weight) * 100) / 100;
+  const deltaLabel = delta > 0 ? `+${delta} kg` : (delta < 0 ? `${delta} kg` : 'Gelijk gebleven');
+  const deltaColor = delta > 0 ? 'var(--accent)' : (delta < 0 ? 'var(--danger)' : 'var(--text-secondary)');
+  return `
+    ${svg}
+    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:13px; color:var(--text-secondary);">
+      <div>${shortDateLabel(first.date)}<br><span style="color:var(--text);">${first.weight} kg</span></div>
+      <div style="text-align:center; color:${deltaColor}; font-weight:600; align-self:center;">${deltaLabel}</div>
+      <div style="text-align:right;">${shortDateLabel(last.date)}<br><span style="color:var(--text);">${last.weight} kg</span></div>
+    </div>
+  `;
+}
+
 function renderDashboard() {
   const c = document.getElementById('dashboardContent');
 
@@ -1293,6 +1406,9 @@ function renderDashboard() {
     return s2 + e.sets.length;
   }, 0), 0);
 
+  const progressName = (dashboardProgressExercise && names.includes(dashboardProgressExercise)) ? dashboardProgressExercise : names[0];
+  const progressPoints = getExerciseProgressPoints(progressName, filtered);
+
   c.innerHTML = `
     ${filterHtml}
     <div class="stat-grid">
@@ -1304,7 +1420,7 @@ function renderDashboard() {
       ${names.map(n => {
         const cat = getExerciseCategory(n);
         return `
-        <div class="pr-row">
+        <div class="pr-row" style="cursor:pointer;" onclick="setDashboardProgressExercise('${escapeAttr(n)}')">
           <div class="pr-info">
             <div class="pr-name">${escapeHtml(n)}</div>
             <div class="pr-meta">${prs[n].reps} reps &middot; ${todayLabel(prs[n].date)}</div>
@@ -1314,6 +1430,15 @@ function renderDashboard() {
         </div>
       `;
       }).join('')}
+    </div>
+    <div class="section-title">Voortgang</div>
+    <div class="card">
+      <div class="field" style="margin-bottom:14px;">
+        <select onchange="setDashboardProgressExercise(this.value)">
+          ${names.map(n => `<option value="${escapeAttrHtml(n)}" ${n === progressName ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}
+        </select>
+      </div>
+      ${renderProgressChart(progressPoints)}
     </div>
   `;
 }
