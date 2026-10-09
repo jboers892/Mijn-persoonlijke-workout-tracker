@@ -368,13 +368,21 @@ function getExerciseCategory(name) {
   return found ? (found.category || '') : '';
 }
 
+// A set beats the current best PR if it has a higher weight, or the same weight with more reps
+function isBetterSet(candidate, best) {
+  if (!best) return true;
+  if (candidate.weight > best.weight) return true;
+  if (candidate.weight === best.weight && candidate.reps > best.reps) return true;
+  return false;
+}
+
 function getExercisePR(name) {
   let best = null;
   state.workouts.forEach(w => {
     w.exercises.forEach(ex => {
       if (ex.name !== name) return;
       ex.sets.forEach(s => {
-        if (!best || s.weight > best.weight) {
+        if (isBetterSet(s, best)) {
           best = { weight: s.weight, reps: s.reps, date: w.date };
         }
       });
@@ -1281,8 +1289,7 @@ function getExerciseProgressPoints(name, workouts) {
     w.exercises.forEach(ex => {
       if (ex.name !== name) return;
       ex.sets.forEach(s => {
-        const existing = byDate.get(w.date);
-        if (!existing || s.weight > existing.weight) {
+        if (isBetterSet(s, byDate.get(w.date))) {
           byDate.set(w.date, { weight: s.weight, reps: s.reps });
         }
       });
@@ -1371,7 +1378,7 @@ function renderDashboard() {
   filtered.forEach(w => {
     w.exercises.forEach(ex => {
       ex.sets.forEach(s => {
-        if (!prs[ex.name] || s.weight > prs[ex.name].weight) {
+        if (isBetterSet(s, prs[ex.name])) {
           prs[ex.name] = { weight: s.weight, reps: s.reps, date: w.date };
         }
       });
